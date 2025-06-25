@@ -1,9 +1,9 @@
-
 import pandas as pd
 from prophet import Prophet
 from meteostat import Daily, Point
 from datetime import datetime
 import plotly.graph_objects as go
+import streamlit as st
 
 def preprocess_data(uploaded_file):
     if uploaded_file.name.endswith('.csv'):
@@ -11,20 +11,29 @@ def preprocess_data(uploaded_file):
     else:
         df = pd.read_excel(uploaded_file)
 
-    df.columns = df.columns.str.strip().str.lower()
+    df.columns = df.columns.str.strip().str.lower()  # Normalize all column names
+
+    # Required columns in original file
+    required_cols = ['date', 'rep name', 'product', 'region', 'qty']
+    missing_cols = [col for col in required_cols if col not in df.columns]
+
+    if missing_cols:
+        st.error(f"❌ The uploaded file is missing required columns: {', '.join(missing_cols)}")
+        st.stop()
+
+    # Rename for internal processing
     df.rename(columns={
         'rep name': 'rep',
         'qty': 'quantity',
-        'date': 'date',
-        'product': 'product',
-        'region': 'region'
     }, inplace=True)
 
-    df['date'] = pd.to_datetime(df['date'])
+    df['date'] = pd.to_datetime(df['date'], errors='coerce')
     df['quantity'] = pd.to_numeric(df['quantity'], errors='coerce').fillna(0)
+
     df = df[['date', 'product', 'rep', 'region', 'quantity']]
     df['day_of_week'] = df['date'].dt.day_name()
 
+    # Add temperature data from Meteostat API
     location = Point(31.5204, 74.3587)  # Lahore
     start = df['date'].min().to_pydatetime()
     end = df['date'].max().to_pydatetime()
@@ -74,3 +83,4 @@ def generate_recommendations(analysis):
     if analysis['Projected % of Target'] >= 100:
         return "✅ You're on track to meet or exceed your target!"
     return f"🚀 You need to sell {analysis['Required per Day']} units/day to hit your goal."
+
