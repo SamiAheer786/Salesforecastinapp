@@ -5,48 +5,14 @@ from datetime import datetime
 import plotly.graph_objects as go
 import streamlit as st
 
-def preprocess_data(uploaded_file):
-    import re
+def preprocess_data(df, date_col, target_col, filter_cols=[]):
+    df = df.copy()
+    df = df[[date_col, target_col] + filter_cols]
+    df.columns = ['date', 'target'] + filter_cols
 
-    if uploaded_file.name.endswith('.csv'):
-        df = pd.read_csv(uploaded_file)
-    else:
-        df = pd.read_excel(uploaded_file)
-
-    # Strong column name cleaner
-    df.columns = (
-        df.columns
-        .str.strip()
-        .str.lower()
-        .str.replace(r"[^\w\s]", "", regex=True)
-        .str.replace(r"\s+", " ", regex=True)
-    )
-
-    st.write("📋 Detected columns:", df.columns.tolist())  # Debugging help
-
-    # Map common variations
-    column_map = {}
-    for col in df.columns:
-        if 'date' in col and 'creation' not in col:
-            column_map['date'] = col
-        elif re.search(r'delivered\s*vol|volume', col):
-            column_map['volume'] = col
-        elif re.search(r'territory|area|region', col):
-            column_map['region'] = col
-
-    # Required columns
-    required = ['date', 'volume', 'region']
-    missing = [r for r in required if r not in column_map]
-    if missing:
-        st.error(f"❌ Required column(s) missing: {', '.join(missing)}")
-        st.stop()
-
-    # Select and rename
-    df = df[[column_map['date'], column_map['volume'], column_map['region']]]
-    df.columns = ['date', 'volume', 'region']
     df['date'] = pd.to_datetime(df['date'], errors='coerce')
-    df['volume'] = pd.to_numeric(df['volume'], errors='coerce')
-    df.dropna(subset=['date', 'volume'], inplace=True)
+    df['target'] = pd.to_numeric(df['target'], errors='coerce')
+    df.dropna(subset=['date', 'target'], inplace=True)
 
     return df
     
