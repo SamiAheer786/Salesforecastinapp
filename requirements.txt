@@ -1,7 +1,7 @@
-
 streamlit
+prophet
 pandas
 plotly
-prophet
 openpyxl
 meteostat
+
