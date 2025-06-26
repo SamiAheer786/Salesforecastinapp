@@ -36,7 +36,7 @@ def plot_forecast(forecast_df):
 def calculate_target_analysis(df, forecast_df, target_value, target_type):
     today = pd.to_datetime(datetime.today().date())
     if target_type == 'Monthly':
-        current = df[df['date'].dt.month == today.month]['quantity'].sum()
+       current = df[df['date'].dt.month == today.month]['target'].sum()
     else:
         current = df['quantity'].sum()
     forecast = forecast_df[forecast_df['ds'] >= today]['yhat'].sum()
