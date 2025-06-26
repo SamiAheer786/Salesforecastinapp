@@ -11,33 +11,23 @@ def preprocess_data(uploaded_file):
     else:
         df = pd.read_excel(uploaded_file)
 
-    df.columns = df.columns.str.strip().str.lower()  # Normalize all column names
+    df.columns = df.columns.str.strip().str.lower()
 
-    # Required columns in original file
     required_cols = ['date', 'rep name', 'product', 'region', 'qty']
     missing_cols = [col for col in required_cols if col not in df.columns]
-
     if missing_cols:
-        st.error(f"❌ The uploaded file is missing required columns: {', '.join(missing_cols)}")
+        st.error(f"❌ Missing required columns: {', '.join(missing_cols)}")
         st.stop()
 
-    # Rename for internal processing
-    df.rename(columns={
-        'rep name': 'rep',
-        'qty': 'quantity',
-    }, inplace=True)
-
+    df.rename(columns={'rep name': 'rep', 'qty': 'quantity'}, inplace=True)
     df['date'] = pd.to_datetime(df['date'], errors='coerce')
     df['quantity'] = pd.to_numeric(df['quantity'], errors='coerce').fillna(0)
-
     df = df[['date', 'product', 'rep', 'region', 'quantity']]
     df['day_of_week'] = df['date'].dt.day_name()
 
-    # Add temperature data from Meteostat API
     location = Point(31.5204, 74.3587)  # Lahore
     start = df['date'].min().to_pydatetime()
     end = df['date'].max().to_pydatetime()
-
     weather = Daily(location, start, end).fetch().reset_index()
     weather = weather[['time', 'tavg']].rename(columns={'time': 'date', 'tavg': 'temperature'})
     df = pd.merge(df, weather, on='date', how='left')
@@ -47,7 +37,7 @@ def preprocess_data(uploaded_file):
 def forecast_sales(df):
     daily = df.groupby('date')['quantity'].sum().reset_index()
     daily.columns = ['ds', 'y']
-    model = Prophet()
+    model = Prophet(daily_seasonality=True)
     model.fit(daily)
     future = model.make_future_dataframe(periods=30)
     forecast = model.predict(future)
@@ -58,12 +48,15 @@ def plot_forecast(forecast_df):
     fig.add_trace(go.Scatter(x=forecast_df['ds'], y=forecast_df['yhat'], name='Forecast'))
     fig.add_trace(go.Scatter(x=forecast_df['ds'], y=forecast_df['yhat_upper'], name='Upper Bound', line=dict(dash='dot')))
     fig.add_trace(go.Scatter(x=forecast_df['ds'], y=forecast_df['yhat_lower'], name='Lower Bound', line=dict(dash='dot')))
-    fig.update_layout(title='📈 Forecasted Sales', xaxis_title='Date', yaxis_title='Sales Quantity')
+    fig.update_layout(title='📈 Forecasted Sales', xaxis_title='Date', yaxis_title='Quantity')
     return fig
 
 def calculate_target_analysis(df, forecast_df, target_value, target_type):
     today = pd.to_datetime(datetime.today().date())
-    current = df[df['date'].dt.month == today.month]['quantity'].sum() if target_type == 'Monthly' else df['quantity'].sum()
+    if target_type == 'Monthly':
+        current = df[df['date'].dt.month == today.month]['quantity'].sum()
+    else:
+        current = df['quantity'].sum()
     forecast = forecast_df[forecast_df['ds'] >= today]['yhat'].sum()
     total = current + forecast
     remaining = max(0, target_value - current)
@@ -83,4 +76,5 @@ def generate_recommendations(analysis):
     if analysis['Projected % of Target'] >= 100:
         return "✅ You're on track to meet or exceed your target!"
     return f"🚀 You need to sell {analysis['Required per Day']} units/day to hit your goal."
+
 
