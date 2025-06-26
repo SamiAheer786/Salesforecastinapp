@@ -6,31 +6,41 @@ import plotly.graph_objects as go
 import streamlit as st
 
 def preprocess_data(uploaded_file):
+    import re
+
     if uploaded_file.name.endswith('.csv'):
         df = pd.read_csv(uploaded_file)
     else:
         df = pd.read_excel(uploaded_file)
 
+    # Clean and normalize column names
     df.columns = df.columns.str.strip().str.lower()
 
-    required_cols = ['date', 'rep name', 'product', 'region', 'qty']
-    missing_cols = [col for col in required_cols if col not in df.columns]
-    if missing_cols:
-        st.error(f"❌ Missing required columns: {', '.join(missing_cols)}")
+    # Map flexible columns to required fields
+    column_map = {}
+    for col in df.columns:
+        if 'date' in col and 'creation' not in col:
+            column_map['date'] = col
+        elif re.search(r'delivered.*vol|volume', col):
+            column_map['volume'] = col
+        elif re.search(r'territory|area|region', col):
+            column_map['region'] = col
+
+    # Required columns
+    required = ['date', 'volume', 'region']
+    missing = [r for r in required if r not in column_map]
+    if missing:
+        st.error(f"❌ Required column(s) missing: {', '.join(missing)}")
         st.stop()
 
-    df.rename(columns={'rep name': 'rep', 'qty': 'quantity'}, inplace=True)
-    df['date'] = pd.to_datetime(df['date'], errors='coerce')
-    df['quantity'] = pd.to_numeric(df['quantity'], errors='coerce').fillna(0)
-    df = df[['date', 'product', 'rep', 'region', 'quantity']]
-    df['day_of_week'] = df['date'].dt.day_name()
+    # Keep and rename only needed columns
+    df = df[[column_map['date'], column_map['volume'], column_map['region']]]
+    df.columns = ['date', 'volume', 'region']
 
-    location = Point(31.5204, 74.3587)  # Lahore
-    start = df['date'].min().to_pydatetime()
-    end = df['date'].max().to_pydatetime()
-    weather = Daily(location, start, end).fetch().reset_index()
-    weather = weather[['time', 'tavg']].rename(columns={'time': 'date', 'tavg': 'temperature'})
-    df = pd.merge(df, weather, on='date', how='left')
+    # Convert data types
+    df['date'] = pd.to_datetime(df['date'], errors='coerce')
+    df['volume'] = pd.to_numeric(df['volume'], errors='coerce')
+    df.dropna(subset=['date', 'volume'], inplace=True)
 
     return df
 
