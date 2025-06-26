@@ -1,4 +1,3 @@
-
 import streamlit as st
 import pandas as pd
 from forecast_utils import (
@@ -7,19 +6,20 @@ from forecast_utils import (
 )
 
 st.set_page_config(page_title="📊 Sales Forecast & Target Tracker", layout="wide")
-st.title("📊 Sales Forecast & Target Tracker")
+st.title("🍦 Hico Ice Cream | Sales Forecast & Target Tracker")
 
-uploaded_file = st.file_uploader("Upload CSV or Excel File", type=["csv", "xlsx"])
+uploaded_file = st.file_uploader("📤 Upload Sales CSV or Excel File", type=["csv", "xlsx"])
 data = None
 
 if uploaded_file:
     data = preprocess_data(uploaded_file)
-    st.success("✅ Data loaded and enriched!")
+    st.success("✅ Data loaded and enriched with weather & weekday info!")
 
 if data is not None:
-    rep = st.selectbox("Filter by Rep", ["All"] + sorted(data['rep'].unique()))
-    product = st.selectbox("Filter by Product", ["All"] + sorted(data['product'].unique()))
-    region = st.selectbox("Filter by Region", ["All"] + sorted(data['region'].unique()))
+    st.sidebar.header("📌 Apply Filters")
+    rep = st.sidebar.selectbox("Rep", ["All"] + sorted(data['rep'].unique()))
+    product = st.sidebar.selectbox("Product", ["All"] + sorted(data['product'].unique()))
+    region = st.sidebar.selectbox("Region", ["All"] + sorted(data['region'].unique()))
 
     df = data.copy()
     if rep != "All":
@@ -30,12 +30,20 @@ if data is not None:
         df = df[df['region'] == region]
 
     forecast_df, model = forecast_sales(df)
+    st.subheader("📊 Forecast Visualization")
     st.plotly_chart(plot_forecast(forecast_df), use_container_width=True)
 
+    st.markdown("---")
+    st.subheader("🎯 Target Analysis")
     target_type = st.radio("Target Type", ["Monthly", "Yearly"])
-    target_value = st.number_input("Enter Sales Target", step=10)
+    target_value = st.number_input("Enter Sales Target (in Quantity)", step=100)
 
     if target_value:
         analysis = calculate_target_analysis(df, forecast_df, target_value, target_type)
+        st.metric(label="📌 Projected Total Sales", value=f"{analysis['Projected Total']} units")
+        st.metric(label="📊 % of Target", value=f"{analysis['Projected % of Target']}%")
         st.write(analysis)
         st.success(generate_recommendations(analysis))
+else:
+    st.info("👋 Upload your sales data to get started.")
+
