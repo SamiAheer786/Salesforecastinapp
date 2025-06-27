@@ -17,7 +17,7 @@ def preprocess_data(df, date_col, target_col, filter_cols=[]):
     return df
     
 def forecast_sales(df):
-    daily = df.groupby('date')['quantity'].sum().reset_index()
+    daily = df.groupby('date')['target'].sum().reset_index()
     daily.columns = ['ds', 'y']
     model = Prophet(daily_seasonality=True)
     model.fit(daily)
@@ -38,7 +38,8 @@ def calculate_target_analysis(df, forecast_df, target_value, target_type):
     if target_type == 'Monthly':
        current = df[df['date'].dt.month == today.month]['target'].sum()
     else:
-        current = df['quantity'].sum()
+        current = df['target'].sum()
+
     forecast = forecast_df[forecast_df['ds'] >= today]['yhat'].sum()
     total = current + forecast
     remaining = max(0, target_value - current)
